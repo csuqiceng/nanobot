@@ -21,6 +21,53 @@ export NO_PROXY=127.0.0.1,localhost          # 本地不走代理；智谱要走
 .venv/bin/nanobot gateway
 ```
 
+### 非公司网络环境（无代理 / 无 MITM）—— 只需三步
+
+如果你在家 / 普通直连网络（没有公司代理、没有 HTTPS MITM），**跳过所有代理与证书环境变量**，只需「config 配对 + 装好 + 启动」。本节是本指南其余部分（公司网络场景）的"精简版"。
+
+**1. config**（`~/.nanobot/config.json`，和环境无关、永远要配）：
+```json
+{
+  "agents": { "defaults": { "model": "glm-4.5-air", "provider": "auto" } },
+  "providers": {
+    "zhipu": {
+      "apiKey": "你的智谱-key",
+      "apiBase": "https://open.bigmodel.cn/api/coding/paas/v4"
+    }
+  },
+  "channels": {
+    "websocket": { "enabled": true, "port": 8765, "tokenIssueSecret": "nanobot", "websocketRequiresToken": true }
+  }
+}
+```
+
+**2. 安装**：
+```bash
+python3 -m venv .venv && .venv/bin/pip install -e .
+cd webui && npm install && cd ..
+```
+
+**3. 启动**（干净的，无需 `SSL_CERT_FILE` / `NO_PROXY` / `HTTPS_PROXY`）：
+```bash
+.venv/bin/nanobot gateway &
+cd webui && NANOBOT_API_URL=http://127.0.0.1:8765 npm run dev
+# 浏览器开 http://127.0.0.1:5173 ，密码 nanobot
+```
+
+**环境对照（哪些是公司环境才需要的负担）**：
+
+| 条件 | 普通环境 | 公司环境（本机） |
+|---|---|---|
+| 端点 `coding/paas/v4` | ✅ 必需 | ✅ 必需 |
+| config apiKey/model | ✅ 必需 | ✅ 必需 |
+| websocket channel（WebUI） | ✅ 必需 | ✅ 必需 |
+| `HTTPS_PROXY` | ❌ 不需要（直连可达） | ✅ 必须走代理 |
+| `NO_PROXY` | ❌ 不需要 | ✅ 只放 127.0.0.1 |
+| `SSL_CERT_FILE`（系统证书） | ❌ 不需要（certifi 能验官方证书） | ✅ 必须（代理 MITM） |
+| 导出 `/tmp/nanobot-cacert.pem` | ❌ 不需要 | ✅ 必须 |
+
+> 三条环境变量（`SSL_CERT_FILE` / `HTTPS_PROXY` / `NO_PROXY`）全是公司代理 MITM 惹出来的额外负担，换个网络就全消失。**唯一不分环境都要注意**：① `coding/paas/v4` 端点必须用（否则 429 余额不足）；② GLM 默认带 reasoning 思考链，首条回复十几秒属正常。
+
 ---
 
 ## 二、Coding Plan 接口知识
